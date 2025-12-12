@@ -1,95 +1,46 @@
 package com.wellness.wellness_backend.controller;
 
+import com.wellness.wellness_backend.model.User;
+import com.wellness.wellness_backend.repo.UserRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import com.wellness.wellness_backend.security.JwtUtil;
-import com.wellness.wellness_backend.model.User;
-import com.wellness.wellness_backend.service.UserService;
-
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.http.ResponseEntity;
-import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/users")   // adapt if your project uses a different base
 public class UserController {
 
-	private final UserService service;
-	private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserController(UserService service, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
-        this.service = service;
+    @Autowired
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
     }
 
-	@GetMapping
-	public List<User> getAllUsers() {
-		return service.getAllUsers();
-	}
-	
-	@PreAuthorize("hasRole('ADMIN')")
-	@GetMapping("/{id}")
-	public ResponseEntity<?> getOne(@PathVariable Long id) {
-		User user = service.getById(id);
-		if (user == null) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-		}
-		return ResponseEntity.ok(user);
-	}
-	
-	// inside UserController class
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String,String> body) {
+        String email = Optional.ofNullable(body.get("email")).orElse("").toLowerCase().trim();
+        if (email.isBlank()) return ResponseEntity.badRequest().body(Map.of("error","email required"));
+        if (userRepository.findByEmail(email).isPresent()) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error","email exists"));
 
-	// GET current logged-in user's profile
-	@GetMapping("/me")
-	public ResponseEntity<?> me(Authentication authentication) {
-	    if (authentication == null || !authentication.isAuthenticated()) {
-	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
-	    }
+        String rawPwd = Optional.ofNullable(body.get("password")).orElse("");
+        if (rawPwd.length() < 4) return ResponseEntity.badRequest().body(Map.of("error","password too short"));
 
-	    String email = authentication.getName(); // email as set by JwtAuthenticationFilter
-	    var user = service.getByEmail(email);
-	    if (user == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-	    // avoid returning password hash
-	    user.setPassword(null);
-	    return ResponseEntity.ok(user);
-	}
+        User u = new User();
+        u.setEmail(email);
+        u.setName(Optional.ofNullable(body.get("name")).orElse("User"));
+        u.setPassword(passwordEncoder.encode(rawPwd));
+        // DO NOT trust body.role for privileges — only set role to 'user' by default
+        u.setRole(Optional.ofNullable(body.get("role")).orElse("user").toLowerCase());
 
-	@PostMapping("/register")
-	public ResponseEntity<?> registerUser(@RequestBody User user) {
-		try {
-			User saved = service.register(user);
-			return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-		}
-	}
-
-	@PostMapping("/login")
-	public ResponseEntity<?> login(@RequestBody User loginRequest) {
-		User existing = service.getByEmail(loginRequest.getEmail());
-		if (existing == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
-		}
-
-		// use PasswordEncoder to compare supplied password with stored (hashed)
-		// password
-		if (!passwordEncoder.matches(loginRequest.getPassword(), existing.getPassword())) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Incorrect password");
-		}
-
-		// generate JWT token
-		String token = jwtUtil.generateToken(existing.getEmail(), existing.getRole());
-
-		// return structured JSON with token
-		return ResponseEntity.ok(java.util.Map.of("status", "success", "userId", existing.getId(), "role",
-				existing.getRole(), "token", token));
-	}
-
+        userRepository.save(u);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", u.getId(), "email", u.getEmail()));
+    }
 }

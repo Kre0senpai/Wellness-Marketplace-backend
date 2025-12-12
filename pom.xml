@@ -13,7 +13,7 @@
   </parent>
 
   <groupId>com.wellness</groupId>
-  <artifactId>wellness-backend</artifactId>
+  <artifactId>wellness-backend.exception</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>wellness-backend</name>
   <description>Wellness Marketplace - backend APIs</description>

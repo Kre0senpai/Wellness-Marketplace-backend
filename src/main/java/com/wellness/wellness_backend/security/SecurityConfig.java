@@ -37,21 +37,35 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // public user endpoints
-                .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
-                // public reads
+                // Allow all common auth paths (wildcard) so small path variants won't break things
+                .requestMatchers("/api/users/auth/**", "/api/auth/**", "/auth/**").permitAll()
+
+                // Extra explicit POST permits for refresh/logout/login (redundant but clear)
+                .requestMatchers(HttpMethod.POST,
+                    "/api/users/auth/refresh",
+                    "/api/users/auth/logout",
+                    "/api/users/auth/login",
+                    "/api/users/auth/register",
+                    "/api/auth/refresh",
+                    "/api/auth/logout",
+                    "/auth/refresh",
+                    "/auth/logout",
+                    "/error" 
+                ).permitAll()
+
+                // Public GET reads
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/practitioners/**", "/api/bookings/**").permitAll()
 
-                // product creation / modification: practitioners and admins can create/update/delete
+                // PRODUCT CRUD: only PRACTITIONER or ADMIN can create/update/delete
                 .requestMatchers(HttpMethod.POST, "/api/products").hasAnyRole("PRACTITIONER", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("PRACTITIONER", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("PRACTITIONER", "ADMIN")
 
-                // bookings: creation requires authentication (any logged-in user)
+                // Bookings: creating a booking requires authentication (any logged-in user)
                 .requestMatchers(HttpMethod.POST, "/api/bookings/**").authenticated()
 
-                // everything else needs authentication
+                // everything else requires authentication
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
