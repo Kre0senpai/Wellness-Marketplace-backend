@@ -45,7 +45,7 @@ public class AuthController {
                     .body(Map.of("error","Invalid credentials"));
         }
 
-        String accessToken = jwtUtil.generateToken(u.getEmail(), u.getRole());
+        String accessToken = jwtUtil.generateToken(null, u.getEmail(), u.getRole());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(u.getId());
 
         return ResponseEntity.ok(Map.of(
@@ -71,7 +71,7 @@ public class AuthController {
         User user = userRepository.findById(refreshToken.getUserId())
                 .orElseThrow(() -> new TokenRefreshException("User not found for refresh token"));
 
-        String newAccess = jwtUtil.generateToken(user.getEmail(), user.getRole());
+        String newAccess = jwtUtil.generateToken(null, user.getEmail(), user.getRole());
 
         return ResponseEntity.ok(Map.of("accessToken", newAccess));
     }

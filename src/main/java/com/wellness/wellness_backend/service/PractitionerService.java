@@ -1,29 +1,97 @@
 package com.wellness.wellness_backend.service;
 
-import org.springframework.stereotype.Service;
-import com.wellness.wellness_backend.repo.PractitionerRepository;
+import com.wellness.wellness_backend.dto.PractitionerDTO;
 import com.wellness.wellness_backend.model.Practitioner;
+import com.wellness.wellness_backend.model.User;
+import com.wellness.wellness_backend.repo.PractitionerRepository;
+import com.wellness.wellness_backend.repo.UserRepository;
+
+import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.EntityNotFoundException;
+
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class PractitionerService {
 
-    private final PractitionerRepository repo;
+    private final PractitionerRepository practitionerRepository;
+    private final UserRepository userRepository;
 
-    public PractitionerService(PractitionerRepository repo) {
-        this.repo = repo;
+    public PractitionerService(PractitionerRepository practitionerRepository,
+                               UserRepository userRepository) {
+        this.practitionerRepository = practitionerRepository;
+        this.userRepository = userRepository;
     }
 
-    public Practitioner create(Practitioner p) {
-        return repo.save(p);
+    // ================================
+    // CREATE PRACTITIONER (JWT-BASED)
+    // ================================
+    public Practitioner createPractitioner(Long userId, PractitionerDTO dto) {
+
+        // 1. Ensure user exists
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("User not found with id: " + userId));
+
+        // 2. Prevent duplicate practitioner profile
+        if (practitionerRepository.existsByUserId(userId)) {
+            throw new EntityExistsException(
+                    "Practitioner profile already exists for this user");
+        }
+
+        // 3. Create practitioner
+        Practitioner p = new Practitioner();
+        p.setUserId(userId);
+        p.setName(dto.getName());
+        p.setSpecialization(dto.getSpecialization());
+        p.setBio(dto.getBio());
+        p.setEmail(dto.getEmail());
+        p.setExperienceYears(
+                dto.getExperienceYears() != null ? dto.getExperienceYears() : 0
+        );
+        p.setVerified(false);
+
+        return practitionerRepository.save(p);
+    }
+    
+    public Long getUserIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email))
+                .getId();
+    }
+    
+    public void deletePractitioner(Long id) {
+        practitionerRepository.deleteById(id);
     }
 
+
+    // ================================
+    // UPDATE PRACTITIONER
+    // ================================
+    public Practitioner updatePractitioner(Practitioner practitioner) {
+        return practitionerRepository.save(practitioner);
+    }
+
+    // ================================
+    // GET ALL PRACTITIONERS
+    // ================================
     public List<Practitioner> getAll() {
-        return repo.findAll();
+        return practitionerRepository.findAll();
     }
 
+    // ================================
+    // GET PRACTITIONER BY ID
+    // ================================
     public Practitioner getById(Long id) {
-        return repo.findById(id).orElse(null);
+        return practitionerRepository.findById(id).orElse(null);
+    }
+
+    // ================================
+    // OPTIONAL: GET BY USER ID
+    // ================================
+    public Practitioner getByUserId(Long userId) {
+        return practitionerRepository.findByUserId(userId);
     }
 }
