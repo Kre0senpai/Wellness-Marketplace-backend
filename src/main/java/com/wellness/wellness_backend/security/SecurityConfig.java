@@ -33,44 +33,52 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
             .authorizeHttpRequests(auth -> auth
 
-                // Allow all common auth paths (wildcard) so small path variants won't break things
-                .requestMatchers("/api/users/auth/**", "/api/auth/**", "/auth/**").permitAll()
-
-                // Extra explicit POST permits for refresh/logout/login (redundant but clear)
-                .requestMatchers(HttpMethod.POST,
-                    "/api/users/auth/refresh",
-                    "/api/users/auth/logout",
-                    "/api/users/auth/login",
-                    "/api/users/auth/register",
-                    "/api/auth/refresh",
-                    "/api/auth/logout",
-                    "/auth/refresh",
-                    "/auth/logout",
-                    "/error" 
+                // ===============================
+                // AUTH / REGISTRATION — PUBLIC
+                // ===============================
+                .requestMatchers(
+                    "/api/users/auth/**",
+                    "/api/auth/**",
+                    "/auth/**",
+                    "/error"
                 ).permitAll()
 
-                // Public GET reads
-                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/practitioners/**", "/api/bookings/**").permitAll()
+                // ===============================
+                // PUBLIC READ-ONLY APIs
+                // ===============================
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/products/**",
+                    "/api/practitioners/**"
+                ).permitAll()
 
-                // PRODUCT CRUD: only PRACTITIONER or ADMIN can create/update/delete
-                .requestMatchers(HttpMethod.POST, "/api/products").hasAnyRole("PRACTITIONER", "ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("PRACTITIONER", "ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("PRACTITIONER", "ADMIN")
+                // ===============================
+                // BOOKINGS — LOGIN REQUIRED
+                // ===============================
+                .requestMatchers(HttpMethod.POST, "/api/bookings/**")
+                .authenticated()
 
-                // Bookings: creating a booking requires authentication (any logged-in user)
-                .requestMatchers(HttpMethod.POST, "/api/bookings/**").authenticated()
+                // ===============================
+                // ADMIN APIs
+                // ===============================
+                .requestMatchers("/api/admin/**")
+                .hasRole("ADMIN")
 
-                // everything else requires authentication
+                // ===============================
+                // EVERYTHING ELSE
+                // ===============================
                 .anyRequest().authenticated()
             )
+
             .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
-        // allow h2-console frames (dev only)
         http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
         return http.build();
     }
