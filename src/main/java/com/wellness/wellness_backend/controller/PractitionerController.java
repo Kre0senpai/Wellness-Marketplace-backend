@@ -54,14 +54,15 @@ public class PractitionerController {
 
         return ResponseEntity.ok("Certificate uploaded successfully");
     }
-
-    // ================================
-    // GET ALL
-    // ================================
     @GetMapping
-    public List<Practitioner> getAll() {
-        return service.getAll();
+    public ResponseEntity<List<Practitioner>> getPractitioners(
+            @RequestParam(required = false) String specialization) {
+
+        return ResponseEntity.ok(
+                service.getVerifiedPractitioners(specialization)
+        );
     }
+
 
     // ================================
     // GET BY ID
@@ -72,7 +73,7 @@ public class PractitionerController {
         if (p == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(p);
     }
-
+    
     // ================================
     // UPDATE (OWNER ONLY)
     // ================================

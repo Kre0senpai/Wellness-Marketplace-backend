@@ -100,6 +100,20 @@ public class PractitionerService {
                 .getId();
     }
     
+    public List<Practitioner> getVerifiedPractitioners(String specialization) {
+
+        if (specialization == null || specialization.isBlank()) {
+            return practitionerRepository.findByVerifiedTrue();
+        }
+
+        return practitionerRepository
+                .findByVerifiedTrueAndSpecializationIgnoreCase(specialization);
+    }
+
+    
+    // ================================
+    // DELETE PRACTITIONER
+    // ================================
     public void deletePractitioner(Long id) {
         practitionerRepository.deleteById(id);
     }
