@@ -11,16 +11,20 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Service
+
+@Service("bookingService")
 public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final PractitionerRepository practitionerRepository;
+    private final PractitionerAvailabilityService availabilityService;
 
     public BookingService(BookingRepository bookingRepository,
-                          PractitionerRepository practitionerRepository) {
+                          PractitionerRepository practitionerRepository,
+                          PractitionerAvailabilityService availabilityService) {
         this.bookingRepository = bookingRepository;
         this.practitionerRepository = practitionerRepository;
+        this.availabilityService = availabilityService;
     }
 
     // =====================================================
@@ -47,6 +51,9 @@ public class BookingService {
         booking.setPractitionerId(practitionerId);
         booking.setSlot(slot);
         booking.setStatus("CREATED"); // force initial state
+        
+        availabilityService.reserveSlot(practitionerId, slot);
+
 
         return bookingRepository.save(booking);
     }
