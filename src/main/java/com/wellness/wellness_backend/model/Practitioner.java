@@ -23,8 +23,18 @@ public class Practitioner {
 
     private String bio;
     private String email;
+    
+    @Column(name = "certificate_path")
+    private String certificatePath;
 
-    private boolean verified = false; // default false
+    public String getCertificatePath() {
+		return certificatePath;
+	}
+
+	public void setCertificatePath(String certificatePath) {
+		this.certificatePath = certificatePath;
+	}
+	private boolean verified = false; // default false
 
     public Practitioner() {}
 

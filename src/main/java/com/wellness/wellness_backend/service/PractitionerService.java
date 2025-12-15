@@ -1,6 +1,7 @@
 package com.wellness.wellness_backend.service;
 
 import com.wellness.wellness_backend.dto.PractitionerDTO;
+
 import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.model.User;
 import com.wellness.wellness_backend.repo.PractitionerRepository;
@@ -8,6 +9,9 @@ import com.wellness.wellness_backend.repo.UserRepository;
 
 import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
+
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.*;
 
 import org.springframework.stereotype.Service;
 
@@ -54,6 +58,40 @@ public class PractitionerService {
         p.setVerified(false);
 
         return practitionerRepository.save(p);
+    }
+    
+    //Certificate upload 
+    public void uploadCertificate(Long userId, MultipartFile file) {
+
+        Practitioner practitioner = practitionerRepository.findByUserId(userId);
+
+        if (practitioner == null) {
+            throw new RuntimeException("Practitioner profile not found");
+        }
+
+        if (!practitioner.isVerified()) {
+            throw new RuntimeException("Practitioner is not verified");
+        }
+
+        if (file.isEmpty()) {
+            throw new RuntimeException("Certificate file is empty");
+        }
+
+        try {
+            String uploadDir = "uploads/certificates/";
+            Files.createDirectories(Paths.get(uploadDir));
+
+            String filename = "practitioner_" + practitioner.getId() + "_" + file.getOriginalFilename();
+            Path filePath = Paths.get(uploadDir + filename);
+
+            Files.write(filePath, file.getBytes());
+
+            practitioner.setCertificatePath(filePath.toString());
+            practitionerRepository.save(practitioner);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload certificate");
+        }
     }
     
     public Long getUserIdByEmail(String email) {

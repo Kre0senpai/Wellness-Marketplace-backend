@@ -1,6 +1,7 @@
 package com.wellness.wellness_backend.controller;
 
 import com.wellness.wellness_backend.dto.PractitionerDTO;
+
 import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.service.PractitionerService;
 
@@ -8,6 +9,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.wellness.wellness_backend.security.AuthUser;
 
 import java.util.List;
 
@@ -32,6 +38,21 @@ public class PractitionerController {
         Long userId = extractUserId(authentication);
         Practitioner created = service.createPractitioner(userId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+    
+    @PostMapping("/certificate")
+    public ResponseEntity<?> uploadCertificate(
+            @RequestParam("file") MultipartFile file) {
+
+        Authentication auth =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        AuthUser user = (AuthUser) auth.getPrincipal();
+        Long userId = user.getUserId();
+
+        service.uploadCertificate(userId, file);
+
+        return ResponseEntity.ok("Certificate uploaded successfully");
     }
 
     // ================================
@@ -91,22 +112,22 @@ public class PractitionerController {
     private Long extractUserId(Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("Unauthenticated");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User is not authenticated"
+            );
         }
 
         Object principal = authentication.getPrincipal();
 
-        // Standard Spring Security case
-        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-            String email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-            return service.getUserIdByEmail(email); // we will add this
+        if (principal instanceof AuthUser authUser) {
+            return authUser.getUserId();
         }
 
-        // Fallback
-        if (principal instanceof String) {
-            return service.getUserIdByEmail((String) principal);
-        }
-
-        throw new RuntimeException("Cannot extract user identity");
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid authentication principal"
+        );
     }
+    
 }
