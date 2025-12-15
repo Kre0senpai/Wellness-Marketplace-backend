@@ -14,14 +14,7 @@ public class Booking {
     // store references by id (optional)
     private Long userId;
     private Long practitionerId;
-
-    // NEW: booking owner email (required for JWT-based access control)
-    @Column(nullable = false)
-    private String userEmail;
-
-    // NEW: practitioner email (used for filtering dashboards)
-    private String practitionerEmail;
-
+    
     private LocalDateTime slot;       // appointment time
     private String status;            // CREATED, CONFIRMED, CANCELLED
     private String notes;
@@ -38,12 +31,6 @@ public class Booking {
 
     public Long getPractitionerId() { return practitionerId; }
     public void setPractitionerId(Long practitionerId) { this.practitionerId = practitionerId; }
-
-    public String getUserEmail() { return userEmail; }
-    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
-
-    public String getPractitionerEmail() { return practitionerEmail; }
-    public void setPractitionerEmail(String practitionerEmail) { this.practitionerEmail = practitionerEmail; }
 
     public LocalDateTime getSlot() { return slot; }
     public void setSlot(LocalDateTime slot) { this.slot = slot; }

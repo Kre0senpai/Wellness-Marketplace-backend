@@ -1,89 +1,125 @@
 package com.wellness.wellness_backend.service;
 
-import org.springframework.stereotype.Service;
-import com.wellness.wellness_backend.repo.BookingRepository;
 import com.wellness.wellness_backend.model.Booking;
+import com.wellness.wellness_backend.model.Practitioner;
+import com.wellness.wellness_backend.repo.BookingRepository;
+import com.wellness.wellness_backend.repo.PractitionerRepository;
 
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Service("bookingService")
+@Service
 public class BookingService {
 
-    private final BookingRepository repo;
-    public BookingService(BookingRepository repo) { this.repo = repo; }
+    private final BookingRepository bookingRepository;
+    private final PractitionerRepository practitionerRepository;
 
-    /**
-     * Create booking. Controller should set userEmail before calling this.
-     */
-    public Booking create(Booking b) {
-        if (b.getStatus() == null) b.setStatus("CREATED");
-        return repo.save(b);
+    public BookingService(BookingRepository bookingRepository,
+                          PractitionerRepository practitionerRepository) {
+        this.bookingRepository = bookingRepository;
+        this.practitionerRepository = practitionerRepository;
     }
 
-    public List<Booking> getAll() { return repo.findAll(); }
+    // =====================================================
+    // CREATE BOOKING (CORE OF MILESTONE-2)
+    // =====================================================
+    public Booking createBooking(Long userId,
+                                 Long practitionerId,
+                                 LocalDateTime slot) {
 
-    public Booking getById(Long id) { return repo.findById(id).orElse(null); }
+        // 1. Validate practitioner
+        Practitioner practitioner = practitionerRepository
+                .findById(practitionerId)
+                .orElseThrow(() ->
+                        new RuntimeException("Practitioner not found"));
 
-    public Booking update(Long id, Booking updated) {
-        return repo.findById(id).map(existing -> {
-            if (updated.getSlot() != null) existing.setSlot(updated.getSlot());
-            if (updated.getStatus() != null) existing.setStatus(updated.getStatus());
-            if (updated.getNotes() != null) existing.setNotes(updated.getNotes());
-            // do NOT overwrite owner fields (userEmail/practitionerEmail) here
-            return repo.save(existing);
+        // 2. Practitioner must be verified
+        if (!practitioner.isVerified()) {
+            throw new RuntimeException("Practitioner is not verified");
+        }
+
+        // 3. Create booking (LOCK ownership + status)
+        Booking booking = new Booking();
+        booking.setUserId(userId);
+        booking.setPractitionerId(practitionerId);
+        booking.setSlot(slot);
+        booking.setStatus("CREATED"); // force initial state
+
+        return bookingRepository.save(booking);
+    }
+
+    // =====================================================
+    // READ APIS (SIMPLE & SAFE)
+    // =====================================================
+    public Booking getById(Long id) {
+        return bookingRepository.findById(id).orElse(null);
+    }
+
+    public List<Booking> getAll() {
+        return bookingRepository.findAll();
+    }
+
+    public List<Booking> getByUserId(Long userId) {
+        return bookingRepository.findByUserId(userId);
+    }
+
+    public List<Booking> getByPractitionerId(Long practitionerId) {
+        return bookingRepository.findByPractitionerId(practitionerId);
+    }
+
+    // =====================================================
+    // UPDATE BOOKING (RESTRICTED)
+    // =====================================================
+    public Booking updateBooking(Long id,
+                                 LocalDateTime newSlot,
+                                 String newStatus) {
+
+        return bookingRepository.findById(id).map(existing -> {
+
+            if (newSlot != null) {
+                existing.setSlot(newSlot);
+            }
+
+            // allow only safe transitions
+            if (newStatus != null) {
+                if (!List.of("CONFIRMED", "CANCELLED", "COMPLETED")
+                        .contains(newStatus)) {
+                    throw new RuntimeException("Invalid booking status");
+                }
+                existing.setStatus(newStatus);
+            }
+
+            return bookingRepository.save(existing);
+
         }).orElse(null);
     }
 
-    public List<Booking> getByUserId(Long userId) { return repo.findByUserId(userId); }
+    // =====================================================
+    // CANCEL BOOKING (SOFT CANCEL)
+    // =====================================================
+    public boolean cancelBooking(Long id) {
 
-    public List<Booking> getByPractitionerId(Long practitionerId) { return repo.findByPractitionerId(practitionerId); }
-
-    // ----------------- NEW METHODS REQUIRED BY CONTROLLER -----------------
-
-    /**
-     * Return bookings belonging to the user identified by email.
-     * Used so non-admin callers can fetch their own bookings.
-     */
-    public List<Booking> getByUserEmail(String userEmail) {
-        return repo.findByUserEmail(userEmail);
-    }
-
-    /**
-     * Return bookings linked to a practitioner by email (for /mine endpoint).
-     */
-    public List<Booking> findByPractitionerEmail(String practitionerEmail) {
-        return repo.findByPractitionerEmail(practitionerEmail);
-    }
-
-    /**
-     * Cancel a booking. This performs a soft-cancel if Booking has `status` field,
-     * otherwise it performs a hard delete.
-     * Returns true if booking existed and was cancelled/deleted.
-     */
-    public boolean cancel(Long id) {
-        Optional<Booking> opt = repo.findById(id);
+        Optional<Booking> opt = bookingRepository.findById(id);
         if (opt.isEmpty()) return false;
-        Booking b = opt.get();
-        // try soft-cancel if model supports status, otherwise hard delete
-        try {
-            b.setStatus("CANCELLED");
-            repo.save(b);
-            return true;
-        } catch (NoSuchMethodError | RuntimeException ex) {
-            // fallback to hard delete
-            repo.deleteById(id);
-            return true;
-        }
+
+        Booking booking = opt.get();
+        booking.setStatus("CANCELLED");
+        bookingRepository.save(booking);
+        return true;
     }
 
-    /**
-     * Owner check used by @PreAuthorize SpEL in controllers.
-     * Returns true if the booking exists and the provided userEmail matches booking.userEmail.
-     */
-    public boolean isOwner(Long bookingId, String userEmail) {
-        if (bookingId == null || userEmail == null) return false;
-        Optional<Booking> opt = repo.findById(bookingId);
-        return opt.isPresent() && userEmail.equals(opt.get().getUserEmail());
+    // =====================================================
+    // OWNERSHIP CHECK (FOR CONTROLLER AUTHORIZATION)
+    // =====================================================
+    public boolean isOwner(Long bookingId, Long userId) {
+
+        if (bookingId == null || userId == null) return false;
+
+        return bookingRepository.findById(bookingId)
+                .map(b -> userId.equals(b.getUserId()))
+                .orElse(false);
     }
 }
