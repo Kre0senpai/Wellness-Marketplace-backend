@@ -69,10 +69,6 @@ public class PractitionerService {
             throw new RuntimeException("Practitioner profile not found");
         }
 
-        if (!practitioner.isVerified()) {
-            throw new RuntimeException("Practitioner is not verified");
-        }
-
         if (file.isEmpty()) {
             throw new RuntimeException("Certificate file is empty");
         }

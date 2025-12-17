@@ -48,9 +48,7 @@ public class AuthController {
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error","Invalid credentials"));
-        }
-
-        // 🔥 IMPORTANT: include userId in JWT
+            }
         String accessToken = jwtUtil.generateToken(
                 user.getId(),          // <-- FIX
                 user.getEmail(),
@@ -82,9 +80,6 @@ public class AuthController {
     }
 
 
-    // =========================
-    // REFRESH TOKEN
-    // =========================
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@RequestBody Map<String,String> body) {
 
@@ -113,9 +108,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("accessToken", newAccess));
     }
 
-    // =========================
-    // LOGOUT
-    // =========================
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestBody Map<String,String> body) {
 

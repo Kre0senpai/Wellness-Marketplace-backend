@@ -16,7 +16,7 @@ public class AdminPractitionerController {
     public AdminPractitionerController(PractitionerService practitionerService) {
         this.practitionerService = practitionerService;
     }
-
+    
     // ================================
     // VERIFY PRACTITIONER (ADMIN ONLY)
     // ================================
@@ -30,12 +30,19 @@ public class AdminPractitionerController {
             return ResponseEntity.notFound().build();
         }
 
+        // 🔒 CRITICAL BUSINESS CHECK
+        if (practitioner.getCertificatePath() == null ||
+            practitioner.getCertificatePath().isBlank()) {
+
+            return ResponseEntity.badRequest()
+                    .body("Cannot verify practitioner without certificate upload");
+        }
+
         practitioner.setVerified(true);
         practitionerService.updatePractitioner(practitioner);
 
         return ResponseEntity.ok("Practitioner verified successfully");
     }
-
     // ================================
     // REJECT PRACTITIONER (ADMIN ONLY)
     // ================================

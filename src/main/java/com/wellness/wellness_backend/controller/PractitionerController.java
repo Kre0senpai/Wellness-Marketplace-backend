@@ -1,19 +1,18 @@
 package com.wellness.wellness_backend.controller;
 
 import com.wellness.wellness_backend.dto.PractitionerDTO;
-
 import com.wellness.wellness_backend.model.Practitioner;
+import com.wellness.wellness_backend.security.AuthUser;
 import com.wellness.wellness_backend.service.PractitionerService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import com.wellness.wellness_backend.security.AuthUser;
 
 import java.util.List;
 
@@ -28,8 +27,9 @@ public class PractitionerController {
     }
 
     // ================================
-    // CREATE PRACTITIONER (JWT USER)
+    // CREATE PRACTITIONER (USER ONLY)
     // ================================
+    @PreAuthorize("hasRole('USER')")
     @PostMapping
     public ResponseEntity<?> create(
             @RequestBody PractitionerDTO dto,
@@ -39,21 +39,25 @@ public class PractitionerController {
         Practitioner created = service.createPractitioner(userId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
-    
+
+    // ================================
+    // UPLOAD CERTIFICATE (OWNER)
+    // ================================
+    @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping("/certificate")
     public ResponseEntity<?> uploadCertificate(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
 
-        Authentication auth =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        AuthUser user = (AuthUser) auth.getPrincipal();
-        Long userId = user.getUserId();
-
+        Long userId = extractUserId(authentication);
         service.uploadCertificate(userId, file);
 
         return ResponseEntity.ok("Certificate uploaded successfully");
     }
+
+    // ================================
+    // GET VERIFIED PRACTITIONERS (PUBLIC)
+    // ================================
     @GetMapping
     public ResponseEntity<List<Practitioner>> getPractitioners(
             @RequestParam(required = false) String specialization) {
@@ -63,9 +67,8 @@ public class PractitionerController {
         );
     }
 
-
     // ================================
-    // GET BY ID
+    // GET PRACTITIONER BY ID (PUBLIC)
     // ================================
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
@@ -73,10 +76,11 @@ public class PractitionerController {
         if (p == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(p);
     }
-    
+
     // ================================
-    // UPDATE (OWNER ONLY)
+    // UPDATE PRACTITIONER (OWNER)
     // ================================
+    @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable Long id,
@@ -130,5 +134,4 @@ public class PractitionerController {
                 "Invalid authentication principal"
         );
     }
-    
 }

@@ -4,7 +4,9 @@ import com.wellness.wellness_backend.model.Booking;
 import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.repo.BookingRepository;
 import com.wellness.wellness_backend.repo.PractitionerRepository;
+import com.wellness.wellness_backend.security.AuthUser;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -116,6 +118,48 @@ public class BookingService {
         booking.setStatus("CANCELLED");
         bookingRepository.save(booking);
         return true;
+    }
+    
+    public void confirmBooking(Long bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!"CREATED".equals(booking.getStatus())) {
+            throw new RuntimeException("Only CREATED bookings can be confirmed");
+        }
+
+        booking.setStatus("CONFIRMED");
+        bookingRepository.save(booking);
+    }
+    
+    public void completeBooking(Long bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!"CONFIRMED".equals(booking.getStatus())) {
+            throw new RuntimeException("Only CONFIRMED bookings can be completed");
+        }
+
+        booking.setStatus("COMPLETED");
+        bookingRepository.save(booking);
+    }
+    
+    public boolean isPractitionerBooking(Long bookingId, Authentication authentication) {
+
+        if (!(authentication.getPrincipal() instanceof AuthUser user)) {
+            return false;
+        }
+
+        Practitioner practitioner =
+                practitionerRepository.findByUserId(user.getUserId());
+
+        if (practitioner == null) return false;
+
+        return bookingRepository.findById(bookingId)
+                .map(b -> b.getPractitionerId().equals(practitioner.getId()))
+                .orElse(false);
     }
 
     // =====================================================
