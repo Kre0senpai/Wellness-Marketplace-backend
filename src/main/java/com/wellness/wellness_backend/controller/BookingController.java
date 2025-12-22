@@ -1,10 +1,8 @@
 package com.wellness.wellness_backend.controller;
 
 import com.wellness.wellness_backend.model.Booking;
-import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.security.AuthUser;
 import com.wellness.wellness_backend.service.BookingService;
-import com.wellness.wellness_backend.repo.PractitionerRepository;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -20,110 +18,82 @@ import java.util.List;
 public class BookingController {
 
     private final BookingService bookingService;
-    private final PractitionerRepository practitionerRepository;
 
-    public BookingController(
-            BookingService bookingService,
-            PractitionerRepository practitionerRepository
-    ) {
+    public BookingController(BookingService bookingService) {
         this.bookingService = bookingService;
-        this.practitionerRepository = practitionerRepository;
     }
 
-    // =====================================================
+    // =========================
     // USER — CREATE BOOKING
-    // =====================================================
+    // =========================
     @PreAuthorize("hasRole('USER')")
     @PostMapping
-    public ResponseEntity<?> createBooking(
+    public ResponseEntity<Booking> createBooking(
             @RequestParam Long practitionerId,
             @RequestParam LocalDateTime slot,
-            Authentication authentication) {
+            Authentication auth) {
 
-        AuthUser user = (AuthUser) authentication.getPrincipal();
+        AuthUser user = (AuthUser) auth.getPrincipal();
 
-        Booking booking = bookingService.createBooking(
-                user.getUserId(),
-                practitionerId,
-                slot
-        );
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(booking);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(bookingService.createBooking(
+                        user.getUserId(), practitionerId, slot));
     }
 
-    // =====================================================
-    // USER — VIEW OWN BOOKINGS
-    // =====================================================
+    // =========================
+    // USER DASHBOARD
+    // =========================
     @PreAuthorize("hasRole('USER')")
-    @GetMapping("/my")
-    public ResponseEntity<List<Booking>> myBookings(Authentication authentication) {
+    @GetMapping("/my/upcoming")
+    public List<Booking> myUpcoming(Authentication auth) {
 
-        AuthUser user = (AuthUser) authentication.getPrincipal();
+        AuthUser user = (AuthUser) auth.getPrincipal();
+        return bookingService.getUserUpcoming(user.getUserId());
+    }
+
+    @PreAuthorize("hasRole('USER')")
+    @GetMapping("/my/past")
+    public List<Booking> myPast(Authentication auth) {
+
+        AuthUser user = (AuthUser) auth.getPrincipal();
+        return bookingService.getUserPast(user.getUserId());
+    }
+
+    // =========================
+    // PRACTITIONER CALENDAR
+    // =========================
+    @PreAuthorize("hasRole('USER')")
+    @GetMapping("/practitioner/calendar")
+    public ResponseEntity<List<Booking>> practitionerCalendar(Authentication auth) {
+
+        AuthUser user = (AuthUser) auth.getPrincipal();
+
         return ResponseEntity.ok(
-                bookingService.getByUserId(user.getUserId())
+                bookingService.getPractitionerCalendar(user.getUserId())
         );
     }
 
-    // =====================================================
-    // PRACTITIONER — VIEW ASSIGNED BOOKINGS
-    // =====================================================
+
+    // =========================
+    // STATUS ACTIONS
+    // =========================
     @PreAuthorize("hasRole('PRACTITIONER')")
-    @GetMapping("/practitioner")
-    public ResponseEntity<List<Booking>> practitionerBookings(Authentication authentication) {
-
-        AuthUser user = (AuthUser) authentication.getPrincipal();
-
-        Practitioner practitioner =
-                practitionerRepository.findByUserId(user.getUserId());
-
-        if (practitioner == null) {
-            throw new RuntimeException("Practitioner profile not found");
-        }
-
-        return ResponseEntity.ok(
-                bookingService.getByPractitionerId(practitioner.getId())
-        );
-    }
-
-    // =====================================================
-    // ADMIN — VIEW ALL BOOKINGS
-    // =====================================================
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping
-    public ResponseEntity<List<Booking>> allBookings() {
-        return ResponseEntity.ok(bookingService.getAll());
-    }
-
-    // =====================================================
-    // CANCEL BOOKING (OWNER / ADMIN)
-    // =====================================================
-    @PreAuthorize("hasRole('ADMIN') or @bookingService.isOwner(#id, authentication)")
-    @PutMapping("/{id}/cancel")
-    public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
-
-        bookingService.cancelBooking(id);
-        return ResponseEntity.ok("Booking cancelled");
-    }
-
-    // =====================================================
-    // CONFIRM BOOKING (PRACTITIONER / ADMIN)
-    // =====================================================
-    @PreAuthorize("hasRole('ADMIN') or @bookingService.isPractitionerBooking(#id, authentication)")
     @PutMapping("/{id}/confirm")
-    public ResponseEntity<?> confirmBooking(@PathVariable Long id) {
-
+    public void confirm(@PathVariable Long id) {
         bookingService.confirmBooking(id);
-        return ResponseEntity.ok("Booking confirmed");
     }
 
-    // =====================================================
-    // COMPLETE BOOKING (PRACTITIONER / ADMIN)
-    // =====================================================
-    @PreAuthorize("hasRole('ADMIN') or @bookingService.isPractitionerBooking(#id, authentication)")
+    @PreAuthorize("hasRole('PRACTITIONER')")
     @PutMapping("/{id}/complete")
-    public ResponseEntity<?> completeBooking(@PathVariable Long id) {
-
+    public void complete(@PathVariable Long id) {
         bookingService.completeBooking(id);
-        return ResponseEntity.ok("Booking completed");
+    }
+
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Booking> cancel(@PathVariable Long id) {
+
+        Booking cancelledBooking = bookingService.cancelBooking(id);
+        return ResponseEntity.ok(cancelledBooking);
     }
 }

@@ -4,15 +4,11 @@ import com.wellness.wellness_backend.model.Booking;
 import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.repo.BookingRepository;
 import com.wellness.wellness_backend.repo.PractitionerRepository;
-import com.wellness.wellness_backend.security.AuthUser;
 
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
-
 
 @Service("bookingService")
 public class BookingService {
@@ -29,97 +25,66 @@ public class BookingService {
         this.availabilityService = availabilityService;
     }
 
-    // =====================================================
-    // CREATE BOOKING (CORE OF MILESTONE-2)
-    // =====================================================
+    // =========================
+    // CREATE BOOKING
+    // =========================
     public Booking createBooking(Long userId,
                                  Long practitionerId,
                                  LocalDateTime slot) {
 
-        // 1. Validate practitioner
         Practitioner practitioner = practitionerRepository
                 .findById(practitionerId)
-                .orElseThrow(() ->
-                        new RuntimeException("Practitioner not found"));
+                .orElseThrow(() -> new RuntimeException("Practitioner not found"));
 
-        // 2. Practitioner must be verified
         if (!practitioner.isVerified()) {
             throw new RuntimeException("Practitioner is not verified");
         }
 
-        // 3. Create booking (LOCK ownership + status)
+        availabilityService.reserveSlot(practitionerId, slot);
+
         Booking booking = new Booking();
         booking.setUserId(userId);
         booking.setPractitionerId(practitionerId);
         booking.setSlot(slot);
-        booking.setStatus("CREATED"); // force initial state
-        
-        availabilityService.reserveSlot(practitionerId, slot);
-
+        booking.setStatus("CREATED");
 
         return bookingRepository.save(booking);
     }
 
-    // =====================================================
-    // READ APIS (SIMPLE & SAFE)
-    // =====================================================
-    public Booking getById(Long id) {
-        return bookingRepository.findById(id).orElse(null);
+    // =========================
+    // USER DASHBOARD
+    // =========================
+    public List<Booking> getUserUpcoming(Long userId) {
+        return bookingRepository
+                .findByUserIdAndSlotAfterOrderBySlotAsc(
+                        userId, LocalDateTime.now());
     }
 
-    public List<Booking> getAll() {
-        return bookingRepository.findAll();
+    public List<Booking> getUserPast(Long userId) {
+        return bookingRepository
+                .findByUserIdAndSlotBeforeOrderBySlotDesc(
+                        userId, LocalDateTime.now());
     }
 
-    public List<Booking> getByUserId(Long userId) {
-        return bookingRepository.findByUserId(userId);
+    // =========================
+    // PRACTITIONER CALENDAR
+    // =========================
+    public List<Booking> getPractitionerCalendar(Long userId) {
+
+        Practitioner practitioner =
+                practitionerRepository.findByUserId(userId);
+
+        if (practitioner == null) {
+            throw new RuntimeException("Practitioner profile not found");
+        }
+
+        return bookingRepository
+                .findByPractitionerIdOrderBySlotAsc(practitioner.getId());
     }
 
-    public List<Booking> getByPractitionerId(Long practitionerId) {
-        return bookingRepository.findByPractitionerId(practitionerId);
-    }
-
-    // =====================================================
-    // UPDATE BOOKING (RESTRICTED)
-    // =====================================================
-    public Booking updateBooking(Long id,
-                                 LocalDateTime newSlot,
-                                 String newStatus) {
-
-        return bookingRepository.findById(id).map(existing -> {
-
-            if (newSlot != null) {
-                existing.setSlot(newSlot);
-            }
-
-            // allow only safe transitions
-            if (newStatus != null) {
-                if (!List.of("CONFIRMED", "CANCELLED", "COMPLETED")
-                        .contains(newStatus)) {
-                    throw new RuntimeException("Invalid booking status");
-                }
-                existing.setStatus(newStatus);
-            }
-
-            return bookingRepository.save(existing);
-
-        }).orElse(null);
-    }
-
-    // =====================================================
-    // CANCEL BOOKING (SOFT CANCEL)
-    // =====================================================
-    public boolean cancelBooking(Long id) {
-
-        Optional<Booking> opt = bookingRepository.findById(id);
-        if (opt.isEmpty()) return false;
-
-        Booking booking = opt.get();
-        booking.setStatus("CANCELLED");
-        bookingRepository.save(booking);
-        return true;
-    }
-    
+    // =========================
+    // STATUS TRANSITIONS
+    // =========================
     public void confirmBooking(Long bookingId) {
 
         Booking booking = bookingRepository.findById(bookingId)
@@ -132,7 +97,7 @@ public class BookingService {
         booking.setStatus("CONFIRMED");
         bookingRepository.save(booking);
     }
-    
+
     public void completeBooking(Long bookingId) {
 
         Booking booking = bookingRepository.findById(bookingId)
@@ -145,32 +110,14 @@ public class BookingService {
         booking.setStatus("COMPLETED");
         bookingRepository.save(booking);
     }
-    
-    public boolean isPractitionerBooking(Long bookingId, Authentication authentication) {
 
-        if (!(authentication.getPrincipal() instanceof AuthUser user)) {
-            return false;
-        }
+    public Booking cancelBooking(Long bookingId) {
 
-        Practitioner practitioner =
-                practitionerRepository.findByUserId(user.getUserId());
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        if (practitioner == null) return false;
-
-        return bookingRepository.findById(bookingId)
-                .map(b -> b.getPractitionerId().equals(practitioner.getId()))
-                .orElse(false);
+        booking.setStatus("CANCELLED");
+        return bookingRepository.save(booking);
     }
 
-    // =====================================================
-    // OWNERSHIP CHECK (FOR CONTROLLER AUTHORIZATION)
-    // =====================================================
-    public boolean isOwner(Long bookingId, Long userId) {
-
-        if (bookingId == null || userId == null) return false;
-
-        return bookingRepository.findById(bookingId)
-                .map(b -> userId.equals(b.getUserId()))
-                .orElse(false);
-    }
 }
