@@ -21,4 +21,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     // PRACTITIONER CALENDAR
     List<Booking> findByPractitionerIdOrderBySlotAsc(Long practitionerId);
+    
+    List<Booking> findByStatusAndSlotBetween(
+            String status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
 }

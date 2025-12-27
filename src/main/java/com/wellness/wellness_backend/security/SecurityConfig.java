@@ -36,23 +36,22 @@ public class SecurityConfig {
 
         http
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
             .authorizeHttpRequests(auth -> auth
 
                 // ===============================
-                // AUTH / REGISTRATION — PUBLIC
+                // AUTH — PUBLIC
                 // ===============================
                 .requestMatchers(
                     "/api/users/auth/**",
-                    "/api/availability/**",
                     "/api/auth/**",
-                    "/auth/**",
                     "/error"
                 ).permitAll()
 
                 // ===============================
-                // PUBLIC READ-ONLY APIs
+                // PUBLIC READ APIs
                 // ===============================
                 .requestMatchers(
                     HttpMethod.GET,
@@ -61,13 +60,35 @@ public class SecurityConfig {
                 ).permitAll()
 
                 // ===============================
-                // BOOKINGS — LOGIN REQUIRED
+                // CART — LOGIN REQUIRED
                 // ===============================
-                .requestMatchers(HttpMethod.POST, "/api/bookings/**")
+                .requestMatchers("/api/cart/**")
                 .authenticated()
 
                 // ===============================
-                // ADMIN APIs
+                // BOOKINGS — LOGIN REQUIRED
+                // ===============================
+                .requestMatchers("/api/bookings/**")
+                .authenticated()
+
+                // ===============================
+                // PRODUCT WRITE — LOGIN REQUIRED
+                // ===============================
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/products"
+                ).authenticated()
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/products/**"
+                ).authenticated()
+                .requestMatchers(
+                    HttpMethod.DELETE,
+                    "/api/products/**"
+                ).authenticated()
+
+                // ===============================
+                // ADMIN
                 // ===============================
                 .requestMatchers("/api/admin/**")
                 .hasRole("ADMIN")
@@ -77,10 +98,11 @@ public class SecurityConfig {
                 // ===============================
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(
+                jwtAuthenticationFilter(),
+                UsernamePasswordAuthenticationFilter.class
+            );
 
-            .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
-
-        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
         return http.build();
     }
 }

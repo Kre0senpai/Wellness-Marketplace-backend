@@ -1,7 +1,6 @@
 package com.wellness.wellness_backend.service;
 
 import com.wellness.wellness_backend.dto.PractitionerDTO;
-
 import com.wellness.wellness_backend.model.Practitioner;
 import com.wellness.wellness_backend.model.User;
 import com.wellness.wellness_backend.repo.PractitionerRepository;
@@ -10,42 +9,60 @@ import com.wellness.wellness_backend.repo.UserRepository;
 import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
 
-import org.springframework.web.multipart.MultipartFile;
-import java.nio.file.*;
-
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 
-@Service
+@Service("practitionerService")
 public class PractitionerService {
 
     private final PractitionerRepository practitionerRepository;
     private final UserRepository userRepository;
 
-    public PractitionerService(PractitionerRepository practitionerRepository,
-                               UserRepository userRepository) {
+    public PractitionerService(
+            PractitionerRepository practitionerRepository,
+            UserRepository userRepository
+    ) {
         this.practitionerRepository = practitionerRepository;
         this.userRepository = userRepository;
     }
 
+    // =====================================================
+    // 🔐 AUTHORIZATION HELPER (USED BY @PreAuthorize)
+    // =====================================================
+    public boolean isVerifiedPractitionerByEmail(String email) {
+        if (email == null || email.isBlank()) return false;
+
+        User user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        if (user == null) return false;
+
+        Practitioner p = practitionerRepository.findByUserId(user.getId());
+        return p != null && p.isVerified();
+    }
+
+
+
     // ================================
-    // CREATE PRACTITIONER (JWT-BASED)
+    // CREATE PRACTITIONER PROFILE
     // ================================
     public Practitioner createPractitioner(Long userId, PractitionerDTO dto) {
 
-        // 1. Ensure user exists
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new EntityNotFoundException("User not found with id: " + userId));
 
-        // 2. Prevent duplicate practitioner profile
         if (practitionerRepository.existsByUserId(userId)) {
             throw new EntityExistsException(
                     "Practitioner profile already exists for this user");
         }
 
-        // 3. Create practitioner
         Practitioner p = new Practitioner();
         p.setUserId(userId);
         p.setName(dto.getName());
@@ -59,8 +76,10 @@ public class PractitionerService {
 
         return practitionerRepository.save(p);
     }
-    
-    //Certificate upload 
+
+    // ================================
+    // UPLOAD CERTIFICATE
+    // ================================
     public void uploadCertificate(Long userId, MultipartFile file) {
 
         Practitioner practitioner = practitionerRepository.findByUserId(userId);
@@ -77,7 +96,8 @@ public class PractitionerService {
             String uploadDir = "uploads/certificates/";
             Files.createDirectories(Paths.get(uploadDir));
 
-            String filename = "practitioner_" + practitioner.getId() + "_" + file.getOriginalFilename();
+            String filename = "practitioner_" + practitioner.getId() + "_" +
+                    file.getOriginalFilename();
             Path filePath = Paths.get(uploadDir + filename);
 
             Files.write(filePath, file.getBytes());
@@ -86,16 +106,23 @@ public class PractitionerService {
             practitionerRepository.save(practitioner);
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to upload certificate");
+            throw new RuntimeException("Failed to upload certificate", e);
         }
     }
-    
+
+    // ================================
+    // USER LOOKUP
+    // ================================
     public Long getUserIdByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email))
+                .orElseThrow(() ->
+                        new RuntimeException("User not found with email: " + email))
                 .getId();
     }
-    
+
+    // ================================
+    // GET VERIFIED PRACTITIONERS
+    // ================================
     public List<Practitioner> getVerifiedPractitioners(String specialization) {
 
         if (specialization == null || specialization.isBlank()) {
@@ -106,14 +133,12 @@ public class PractitionerService {
                 .findByVerifiedTrueAndSpecializationIgnoreCase(specialization);
     }
 
-    
     // ================================
     // DELETE PRACTITIONER
     // ================================
     public void deletePractitioner(Long id) {
         practitionerRepository.deleteById(id);
     }
-
 
     // ================================
     // UPDATE PRACTITIONER
@@ -137,7 +162,7 @@ public class PractitionerService {
     }
 
     // ================================
-    // OPTIONAL: GET BY USER ID
+    // GET PRACTITIONER BY USER ID
     // ================================
     public Practitioner getByUserId(Long userId) {
         return practitionerRepository.findByUserId(userId);

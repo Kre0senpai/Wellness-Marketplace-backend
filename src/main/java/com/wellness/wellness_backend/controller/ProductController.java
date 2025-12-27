@@ -1,14 +1,12 @@
 package com.wellness.wellness_backend.controller;
 
 import com.wellness.wellness_backend.model.Product;
+import com.wellness.wellness_backend.service.PractitionerService;
 import com.wellness.wellness_backend.service.ProductService;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import java.util.Map;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -16,64 +14,97 @@ import java.util.List;
 @RequestMapping("/api/products")
 public class ProductController {
 
-    private final ProductService service;
-    public ProductController(ProductService service) { this.service = service; }
+    private final ProductService productService;
+    private final PractitionerService practitionerService;
 
-    // only PRACTITIONER or ADMIN can create products
-    @PreAuthorize("hasRole('PRACTITIONER') or hasRole('ADMIN')")
+    public ProductController(ProductService productService,
+                             PractitionerService practitionerService) {
+        this.productService = productService;
+        this.practitionerService = practitionerService;
+    }
+
     @PostMapping
-    public ResponseEntity<Product> create(@RequestBody Product p, Authentication auth) {
-        // ensure owner is taken from authenticated user — do NOT trust client-provided owner
-        String email = (auth != null) ? auth.getName() : null;
-        if (email != null) {
-            p.setOwnerEmail(email.toLowerCase().trim());
+    public ResponseEntity<Product> create(@RequestBody Product product,
+                                          Authentication auth) {
+
+        String email = auth.getName(); // 👈 THIS IS EMAIL IN YOUR APP
+
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        boolean isVerifiedPractitioner =
+                practitionerService.isVerifiedPractitionerByEmail(email);
+
+        if (!isAdmin && !isVerifiedPractitioner) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        Product saved = service.create(p);
+
+        Product saved = productService.create(product, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
-
-    @GetMapping
-    public List<Product> getAll() {
-        return service.getAll();
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable Long id) {
-        Product p = service.getById(id);
-        if (p == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(p);
-    }
     
-    // owner or admin can update
-    @PreAuthorize("hasRole('ADMIN') or @productService.isOwner(#id, authentication.name)")
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Product update, Authentication auth) {
-        Product existing = service.getById(id);
-        if (existing == null) return ResponseEntity.notFound().build();
-        update.setId(id);
-        update.setOwnerEmail(existing.getOwnerEmail()); // preserve owner
-        Product saved = service.update(id, update);
+    public ResponseEntity<Product> update(
+            @PathVariable Long id,
+            @RequestBody Product update,
+            Authentication auth
+    ) {
+
+        String email = auth.getName();
+
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        // only owner or admin allowed
+        Product existing = productService.getById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (!isAdmin && !existing.getOwnerEmail().equalsIgnoreCase(email)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        Product saved = productService.update(id, update);
         return ResponseEntity.ok(saved);
     }
 
-    // owner or admin can delete
-    @PreAuthorize("hasRole('ADMIN') or @productService.isOwner(#id, authentication.name)")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
-        boolean ok = service.delete(id);
-        if (!ok) return ResponseEntity.notFound().build();
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            Authentication auth
+    ) {
+
+        String email = auth.getName();
+
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        Product existing = productService.getById(id);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // only owner or admin allowed
+        if (!isAdmin && !existing.getOwnerEmail().equalsIgnoreCase(email)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        productService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
-    
-    @GetMapping("/debug-auth")
-    public Map<String,Object> debugAuth() {
-        Authentication a = SecurityContextHolder.getContext().getAuthentication();
-        return Map.of(
-            "principal", a==null?null:a.getPrincipal(),
-            "name", a==null?null:a.getName(),
-            "authenticated", a==null?false:a.isAuthenticated(),
-            "authorities", a==null?null:a.getAuthorities()
-        );
+
+    @GetMapping
+    public List<Product> getAll() {
+        return productService.getAll();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Product> getById(@PathVariable Long id) {
+        Product p = productService.getById(id);
+        return p == null
+                ? ResponseEntity.notFound().build()
+                : ResponseEntity.ok(p);
     }
 }

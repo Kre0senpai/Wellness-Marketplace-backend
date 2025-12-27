@@ -6,24 +6,29 @@ import jakarta.persistence.*;
 @Table(name = "products")
 public class Product {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String name;
 
     @Column(length = 1000)
     private String description;
 
+    @Column(nullable = false)
     private Double price;
-    private Integer stock;
-    private String category;
 
     @Column(nullable = false)
+    private Integer stock;
+
+    private String category;
+
+    @Column(nullable = false, updatable = false)
     private String ownerEmail;
 
     public Product() {}
 
-    // getters & setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -44,15 +49,7 @@ public class Product {
 
     public String getOwnerEmail() { return ownerEmail; }
 
-    /**
-     * Normalize owner email on set so comparisons are reliable.
-     * Use lower-case trimmed email.
-     */
     public void setOwnerEmail(String ownerEmail) {
-        if (ownerEmail == null) {
-            this.ownerEmail = null;
-        } else {
-            this.ownerEmail = ownerEmail.toLowerCase().trim();
-        }
+        this.ownerEmail = ownerEmail == null ? null : ownerEmail.toLowerCase().trim();
     }
 }

@@ -1,13 +1,14 @@
 package com.wellness.wellness_backend.security;
 
-import org.springframework.security.core.context.SecurityContextHolder;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,47 +23,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest req,
-            HttpServletResponse res,
-            FilterChain chain) throws ServletException, IOException {
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String header = req.getHeader("Authorization");
+        String header = request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
+        // NO TOKEN → JUST CONTINUE
+        if (header == null || !header.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        try {
             String token = header.substring(7);
 
-            try {
-                String username = jwtUtil.getUsername(token);
-                String role = jwtUtil.getRole(token);
-                Long userId = jwtUtil.getUserId(token); // <-- IMPORTANT
+            if (!jwtUtil.validateToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
-                SimpleGrantedAuthority authority =
-                        new SimpleGrantedAuthority("ROLE_" + role.toUpperCase());
+            String username = jwtUtil.getUsername(token);
 
-                AuthUser principal = new AuthUser(
-                        userId,
-                        username,
-                        List.of(authority)
-                );
+            if (username != null &&
+                SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                principal,
+                                username,
                                 null,
-                                principal.getAuthorities()
+                                List.of(new SimpleGrantedAuthority(
+                                        "ROLE_" + jwtUtil.getRole(token).toUpperCase()
+                                ))
                         );
 
                 authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(req)
+                        new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            } catch (Exception ex) {
-                SecurityContextHolder.clearContext();
             }
+
+        } catch (Exception e) {
+            SecurityContextHolder.clearContext();
         }
 
-        chain.doFilter(req, res);
+        filterChain.doFilter(request, response);
     }
 }
