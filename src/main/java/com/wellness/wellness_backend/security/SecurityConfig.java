@@ -41,39 +41,30 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
 
-                // ===============================
-                // AUTH — PUBLIC
-                // ===============================
+                // PUBLIC AUTH
                 .requestMatchers(
                     "/api/users/auth/**",
                     "/api/auth/**",
                     "/error"
                 ).permitAll()
 
-                // ===============================
-                // PUBLIC READ APIs
-                // ===============================
+                // PUBLIC READ
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/products/**",
                     "/api/practitioners/**"
                 ).permitAll()
 
-                // ===============================
-                // CART — LOGIN REQUIRED
-                // ===============================
-                .requestMatchers("/api/cart/**")
-                .authenticated()
+                // CART
+                .requestMatchers("/api/cart/**").authenticated()
 
-                // ===============================
-                // BOOKINGS — LOGIN REQUIRED
-                // ===============================
-                .requestMatchers("/api/bookings/**")
-                .authenticated()
+                // BOOKINGS
+                .requestMatchers("/api/bookings/**").authenticated()
 
-                // ===============================
-                // PRODUCT WRITE — LOGIN REQUIRED
-                // ===============================
+                // ORDERS (🔥 THIS WAS MISSING)
+                .requestMatchers("/api/orders/**").authenticated()
+
+                // PRODUCT WRITE
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/products"
@@ -87,15 +78,10 @@ public class SecurityConfig {
                     "/api/products/**"
                 ).authenticated()
 
-                // ===============================
                 // ADMIN
-                // ===============================
                 .requestMatchers("/api/admin/**")
                 .hasRole("ADMIN")
 
-                // ===============================
-                // EVERYTHING ELSE
-                // ===============================
                 .anyRequest().authenticated()
             )
             .addFilterBefore(
