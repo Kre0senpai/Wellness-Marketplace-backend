@@ -10,6 +10,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
@@ -32,39 +38,109 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Allow frontend origin
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000",
+            "http://localhost:3001"
+        ));
+        
+        // Allow all HTTP methods
+        configuration.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
+        
+        // Allow all headers
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // Allow credentials (cookies, authorization headers)
+        configuration.setAllowCredentials(true);
+        
+        // Expose headers
+        configuration.setExposedHeaders(Arrays.asList(
+            "Authorization", "Content-Type"
+        ));
+        
+        // Max age for preflight requests
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // Disable CSRF (we're using JWT tokens)
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(sm ->
-                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
+            
+            // Enable CORS with our configuration
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            
+            // Configure authorization rules
             .authorizeHttpRequests(auth -> auth
+                // ============================================
+                // WEBSOCKET ENDPOINTS - MUST BE FIRST!
+                // ============================================
+                .requestMatchers(
+                    "/ws/**",           // WebSocket endpoint
+                    "/app/**",          // STOMP app destinations
+                    "/topic/**",        // STOMP topic destinations
+                    "/user/**"          // STOMP user destinations
+                ).permitAll()
 
-                // PUBLIC AUTH
+                // ============================================
+                // PUBLIC AUTH ENDPOINTS
+                // ============================================
                 .requestMatchers(
                     "/api/users/auth/**",
                     "/api/auth/**",
                     "/error"
                 ).permitAll()
 
-                // PUBLIC READ
+                // ============================================
+                // PUBLIC READ ENDPOINTS
+                // ============================================
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/products/**",
                     "/api/practitioners/**"
                 ).permitAll()
 
-                // CART
+                // ============================================
+                // AUTHENTICATED USER ENDPOINTS
+                // ============================================
+                
+                // User Profile
+                .requestMatchers("/api/users/**").authenticated()
+
+                // Cart
                 .requestMatchers("/api/cart/**").authenticated()
 
-                // BOOKINGS
+                // Bookings
                 .requestMatchers("/api/bookings/**").authenticated()
 
-                // ORDERS (🔥 THIS WAS MISSING)
+                // Orders
                 .requestMatchers("/api/orders/**").authenticated()
 
-                // PRODUCT WRITE
+                // Reviews
+                .requestMatchers("/api/reviews/**").authenticated()
+
+                // Community Q&A
+                .requestMatchers("/api/qa/**").authenticated()
+
+                // Recommendations
+                .requestMatchers("/api/recommendations/**").authenticated()
+
+                // Notifications
+                .requestMatchers("/api/notifications/**").authenticated()
+
+                // ============================================
+                // PRODUCT WRITE OPERATIONS
+                // ============================================
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/products"
@@ -78,12 +154,24 @@ public class SecurityConfig {
                     "/api/products/**"
                 ).authenticated()
 
-                // ADMIN
+                // ============================================
+                // ADMIN ENDPOINTS
+                // ============================================
                 .requestMatchers("/api/admin/**")
-                .hasRole("ADMIN")
+                    .hasRole("ADMIN")
 
+                // ============================================
+                // ALL OTHER REQUESTS
+                // ============================================
                 .anyRequest().authenticated()
             )
+            
+            // Stateless session management (JWT tokens)
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            
+            // Add JWT filter before username/password authentication
             .addFilterBefore(
                 jwtAuthenticationFilter(),
                 UsernamePasswordAuthenticationFilter.class

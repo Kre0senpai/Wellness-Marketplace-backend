@@ -4,10 +4,13 @@ import com.wellness.wellness_backend.model.Notification;
 import com.wellness.wellness_backend.model.User;
 import com.wellness.wellness_backend.service.NotificationService;
 import com.wellness.wellness_backend.service.UserService;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -28,4 +31,6 @@ public class NotificationController {
         User user = userService.getByEmail(principal.getName());
         return notificationService.getUserNotifications(user.getId());
     }
+    
+    
 }
