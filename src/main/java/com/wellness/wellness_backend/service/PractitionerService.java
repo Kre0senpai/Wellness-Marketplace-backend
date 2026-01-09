@@ -132,6 +132,36 @@ public class PractitionerService {
         return practitionerRepository
                 .findByVerifiedTrueAndSpecializationIgnoreCase(specialization);
     }
+    
+	// ================================
+	// ADMIN: GET UNVERIFIED PRACTITIONERS
+	// ================================
+	public List<Practitioner> getUnverifiedPractitioners() {
+	    return practitionerRepository.findByVerifiedFalse();
+	}
+	
+	// ================================
+	// ADMIN: VERIFY PRACTITIONER
+	// ================================
+	public Practitioner verifyPractitioner(Long practitionerId) {
+
+	    Practitioner practitioner = practitionerRepository.findById(practitionerId)
+	            .orElseThrow(() -> new RuntimeException("Practitioner not found"));
+	    
+	    if (practitioner.isVerified()) {
+	        throw new RuntimeException("Practitioner is already verified");
+	    }
+
+	    if (practitioner.getCertificatePath() == null ||
+	        practitioner.getCertificatePath().isBlank()) {
+	        throw new RuntimeException("Cannot verify practitioner without certificate");
+	    }
+
+	    practitioner.setVerified(true);
+	    return practitionerRepository.save(practitioner);
+	}
+
+
 
     // ================================
     // DELETE PRACTITIONER

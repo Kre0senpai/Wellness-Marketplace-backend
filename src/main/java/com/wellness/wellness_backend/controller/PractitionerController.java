@@ -58,7 +58,7 @@ public class PractitionerController {
     }
 
     // ================================
-    // GET VERIFIED PRACTITIONERS (PUBLIC)
+    // GET PRACTITIONERS (PUBLIC)
     // ================================
     @GetMapping
     public ResponseEntity<List<Practitioner>> getPractitioners(
@@ -69,6 +69,19 @@ public class PractitionerController {
         );
     }
 
+	 // ================================
+	 // GET VERIFIED PRACTITIONERS (PUBLIC)
+	 // ================================
+	 @GetMapping("/verified")
+	 public ResponseEntity<List<Practitioner>> getVerifiedPractitioners(
+	         @RequestParam(required = false) String specialization
+	 ) {
+	     return ResponseEntity.ok(
+	         service.getVerifiedPractitioners(specialization)
+	     );
+	 }
+	 
+	 
     // ================================
     // GET PRACTITIONER BY ID (PUBLIC)
     // ================================
