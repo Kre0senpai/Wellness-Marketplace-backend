@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/practitioners")
+@RequestMapping("/api/users/practitioners")
 public class PractitionerController {
 
     private final PractitionerService service;
@@ -29,7 +30,7 @@ public class PractitionerController {
     // ================================
     // CREATE PRACTITIONER (USER ONLY)
     // ================================
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping
     public ResponseEntity<?> create(
             @RequestBody PractitionerDTO dto,
@@ -46,11 +47,12 @@ public class PractitionerController {
     @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping("/certificate")
     public ResponseEntity<?> uploadCertificate(
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication) {
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestParam("certificate") MultipartFile certificate
+    ) {
 
-        Long userId = extractUserId(authentication);
-        service.uploadCertificate(userId, file);
+        Long userId = authUser.getUserId();
+        service.uploadCertificate(userId, certificate);
 
         return ResponseEntity.ok("Certificate uploaded successfully");
     }
