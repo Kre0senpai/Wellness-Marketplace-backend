@@ -82,6 +82,10 @@ public class SecurityConfig {
             
             // Configure authorization rules
             .authorizeHttpRequests(auth -> auth
+            		
+        		// ALLOW PREFLIGHT REQUESTS
+        	    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            		
                 // ============================================
                 // WEBSOCKET ENDPOINTS - MUST BE FIRST!
                 // ============================================
@@ -153,6 +157,10 @@ public class SecurityConfig {
                     HttpMethod.DELETE,
                     "/api/products/**"
                 ).authenticated()
+                .requestMatchers(
+            	    HttpMethod.POST,
+            	    "/api/practitioners/**"
+            	).authenticated()
 
                 // ============================================
                 // ADMIN ENDPOINTS
@@ -160,6 +168,20 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
 
+                 // ================================
+                 // USER → PRACTITIONER ENDPOINTS
+                 // ================================
+                 .requestMatchers(
+                     HttpMethod.POST,
+                     "/api/users/practitioners/**"
+                 ).authenticated()
+
+                 .requestMatchers(
+                     HttpMethod.PUT,
+                     "/api/users/practitioners/**"
+                 ).authenticated()
+                 
+                 
                 // ============================================
                 // ALL OTHER REQUESTS
                 // ============================================
