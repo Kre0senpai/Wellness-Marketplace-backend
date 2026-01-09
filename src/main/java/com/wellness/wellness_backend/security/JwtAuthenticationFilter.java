@@ -49,14 +49,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (username != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                username,
-                                null,
-                                List.of(new SimpleGrantedAuthority(
-                                        "ROLE_" + jwtUtil.getRole(token).toUpperCase()
-                                ))
-                        );
+            	var authorities = List.of(
+            		    new SimpleGrantedAuthority(
+            		        "ROLE_" + jwtUtil.getRole(token).toUpperCase()
+            		    )
+            		);
+
+        		AuthUser authUser = new AuthUser(
+        		        jwtUtil.getUserId(token),   // MUST come from JWT
+        		        jwtUtil.getUsername(token),
+        		        authorities
+        		);
+
+        		UsernamePasswordAuthenticationToken authentication =
+        		        new UsernamePasswordAuthenticationToken(
+        		                authUser,
+        		                null,
+        		                authorities
+        		        );
 
                 authentication.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request)
