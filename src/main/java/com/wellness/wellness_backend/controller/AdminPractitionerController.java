@@ -17,6 +17,18 @@ public class AdminPractitionerController {
         this.practitionerService = practitionerService;
     }
     
+	 // ================================
+	 // GET PENDING PRACTITIONERS (ADMIN)
+	 // ================================
+	 @GetMapping("/pending")
+	 @PreAuthorize("hasRole('ADMIN')")
+	 public ResponseEntity<?> getPendingPractitioners() {
+	
+	     return ResponseEntity.ok(
+	             practitionerService.getUnverifiedPractitioners()
+	     );
+	 }
+
     // ================================
     // VERIFY PRACTITIONER (ADMIN ONLY)
     // ================================
@@ -38,8 +50,7 @@ public class AdminPractitionerController {
                     .body("Cannot verify practitioner without certificate upload");
         }
 
-        practitioner.setVerified(true);
-        practitionerService.updatePractitioner(practitioner);
+        practitionerService.verifyPractitioner(id);
 
         return ResponseEntity.ok("Practitioner verified successfully");
     }

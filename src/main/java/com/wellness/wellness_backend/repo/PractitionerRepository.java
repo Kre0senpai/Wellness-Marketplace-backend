@@ -10,6 +10,7 @@ public interface PractitionerRepository extends JpaRepository<Practitioner, Long
     Practitioner findByUserId(Long userId);
     
     List<Practitioner> findByVerifiedTrue();
+    List<Practitioner> findByVerifiedFalse();
     List<Practitioner> findByVerifiedTrueAndSpecializationIgnoreCase(String specialization);
 
 }
