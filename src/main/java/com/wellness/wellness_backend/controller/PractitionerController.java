@@ -2,43 +2,42 @@ package com.wellness.wellness_backend.controller;
 
 import com.wellness.wellness_backend.dto.PractitionerDTO;
 import com.wellness.wellness_backend.model.Practitioner;
-import com.wellness.wellness_backend.model.User;
+import com.wellness.wellness_backend.security.AuthUser;
 import com.wellness.wellness_backend.service.PractitionerService;
-import com.wellness.wellness_backend.service.UserService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.security.Principal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/practitioners")
+@RequestMapping("/api/users/practitioners")
 public class PractitionerController {
 
     private final PractitionerService service;
-    private final UserService userService;
 
-    public PractitionerController(PractitionerService service,
-                                  UserService userService) {
+    public PractitionerController(PractitionerService service) {
         this.service = service;
-        this.userService = userService;
     }
 
     // ================================
     // CREATE PRACTITIONER (USER ONLY)
     // ================================
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping
     public ResponseEntity<?> create(
             @RequestBody PractitionerDTO dto,
-            Principal principal) {
+            Authentication authentication) {
 
-        User user = userService.getByEmail(principal.getName());
-        Practitioner created = service.createPractitioner(user.getId(), dto);
+        Long userId = extractUserId(authentication);
+        Practitioner created = service.createPractitioner(userId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -48,11 +47,12 @@ public class PractitionerController {
     @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping("/certificate")
     public ResponseEntity<?> uploadCertificate(
-            @RequestParam("file") MultipartFile file,
-            Principal principal) {
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestParam("certificate") MultipartFile certificate
+    ) {
 
-        User user = userService.getByEmail(principal.getName());
-        service.uploadCertificate(user.getId(), file);
+        Long userId = authUser.getUserId();
+        service.uploadCertificate(userId, certificate);
 
         return ResponseEntity.ok("Certificate uploaded successfully");
     }
@@ -74,11 +74,8 @@ public class PractitionerController {
     // ================================
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
-
         Practitioner p = service.getById(id);
-        if (p == null) {
-            return ResponseEntity.notFound().build();
-        }
+        if (p == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(p);
     }
 
@@ -90,7 +87,7 @@ public class PractitionerController {
     public ResponseEntity<?> update(
             @PathVariable Long id,
             @RequestBody PractitionerDTO dto,
-            Principal principal) {
+            Authentication authentication) {
 
         Practitioner existing = service.getById(id);
         if (existing == null) {
@@ -98,9 +95,9 @@ public class PractitionerController {
                     .body("Practitioner not found");
         }
 
-        User user = userService.getByEmail(principal.getName());
+        Long userId = extractUserId(authentication);
 
-        if (!user.getId().equals(existing.getUserId())) {
+        if (!userId.equals(existing.getUserId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("You cannot update this practitioner");
         }
@@ -114,5 +111,29 @@ public class PractitionerController {
 
         Practitioner saved = service.updatePractitioner(existing);
         return ResponseEntity.ok(saved);
+    }
+
+    // ================================
+    // EXTRACT USER ID FROM JWT
+    // ================================
+    private Long extractUserId(Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "User is not authenticated"
+            );
+        }
+
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof AuthUser authUser) {
+            return authUser.getUserId();
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid authentication principal"
+        );
     }
 }
