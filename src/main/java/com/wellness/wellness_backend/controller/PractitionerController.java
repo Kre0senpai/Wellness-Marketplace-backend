@@ -16,7 +16,7 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/practitioners")
+@RequestMapping("/api/users/practitioners")
 public class PractitionerController {
 
     private final PractitionerService service;
@@ -31,7 +31,7 @@ public class PractitionerController {
     // ================================
     // CREATE PRACTITIONER (USER ONLY)
     // ================================
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('PRACTITIONER')")
     @PostMapping
     public ResponseEntity<?> create(
             @RequestBody PractitionerDTO dto,

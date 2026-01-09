@@ -153,6 +153,10 @@ public class SecurityConfig {
                     HttpMethod.DELETE,
                     "/api/products/**"
                 ).authenticated()
+                .requestMatchers(
+            	    HttpMethod.POST,
+            	    "/api/practitioners/**"
+            	).authenticated()
 
                 // ============================================
                 // ADMIN ENDPOINTS
